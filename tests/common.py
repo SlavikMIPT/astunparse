@@ -182,12 +182,13 @@ class AstunparseCommonTestCase:
     def test_files(self):
         names = []
         for test_dir in self.test_directories:
-            for n in os.listdir(test_dir):
-                if n.endswith('.py') and not n.startswith('bad'):
-                    names.append(os.path.join(test_dir, n))
-
+            names.extend(
+                os.path.join(test_dir, n)
+                for n in os.listdir(test_dir)
+                if n.endswith('.py') and not n.startswith('bad')
+            )
         for filename in names:
-            print('Testing %s' % filename)
+            print(f'Testing {filename}')
             source = read_pyfile(filename)
             self.check_roundtrip(source)
 
@@ -228,7 +229,7 @@ class AstunparseCommonTestCase:
     @unittest.skipUnless(six.PY2, "Only works for Python 2")
     def test_min_int27(self):
         self.check_roundtrip(str(-sys.maxint-1))
-        self.check_roundtrip("-(%s)" % (sys.maxint + 1))
+        self.check_roundtrip(f"-({sys.maxint + 1})")
 
     @unittest.skipUnless(six.PY3, "Only works for Python 3")
     def test_min_int30(self):

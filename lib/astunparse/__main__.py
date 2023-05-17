@@ -21,8 +21,8 @@ def roundtrip_recursive(target, dump_tree=False):
                 roundtrip_recursive(os.path.join(target, item), dump_tree)
     else:
         print(
-            "WARNING: skipping '%s', not a file or directory" % target,
-            file=sys.stderr
+            f"WARNING: skipping '{target}', not a file or directory",
+            file=sys.stderr,
         )
 
 

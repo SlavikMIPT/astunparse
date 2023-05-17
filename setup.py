@@ -19,9 +19,8 @@ if sys.version_info < (2, 7):
 
 def read_version():
     with open(os.path.join('lib', 'astunparse', '__init__.py')) as f:
-        m = re.search(r'''__version__\s*=\s*['"]([^'"]*)['"]''', f.read())
-        if m:
-            return m.group(1)
+        if m := re.search(r'''__version__\s*=\s*['"]([^'"]*)['"]''', f.read()):
+            return m[1]
         raise ValueError("couldn't find version")
 
 

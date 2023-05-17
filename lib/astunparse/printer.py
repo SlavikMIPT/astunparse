@@ -25,9 +25,9 @@ class Printer(ast.NodeVisitor):
             nodeend = "]"
             children = [("", child) for child in node]
         else:
-            nodestart = type(node).__name__ + "("
+            nodestart = f"{type(node).__name__}("
             nodeend = ")"
-            children = [(name + "=", value) for name, value in ast.iter_fields(node)]
+            children = [(f"{name}=", value) for name, value in ast.iter_fields(node)]
 
         if len(children) > 1:
             self.indentation += 1

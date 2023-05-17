@@ -9,7 +9,7 @@ from six import StringIO
 
 # Large float and imaginary literals get turned into infinities in the AST.
 # We unparse those infinities to INFSTR.
-INFSTR = "1e" + repr(sys.float_info.max_10_exp + 1)
+INFSTR = f"1e{repr(sys.float_info.max_10_exp + 1)}"
 
 def interleave(inter, f, seq):
     """Call f on each item in seq, calling inter() in between.
@@ -62,7 +62,7 @@ class Unparser:
             for t in tree:
                 self.dispatch(t)
             return
-        meth = getattr(self, "_"+tree.__class__.__name__)
+        meth = getattr(self, f"_{tree.__class__.__name__}")
         meth(tree)
 
 
@@ -122,7 +122,7 @@ class Unparser:
     def _AugAssign(self, t):
         self.fill()
         self.dispatch(t.target)
-        self.write(" "+self.binop[t.op.__class__.__name__]+"= ")
+        self.write(f" {self.binop[t.op.__class__.__name__]}= ")
         self.dispatch(t.value)
 
     def _AnnAssign(self, t):
@@ -309,7 +309,7 @@ class Unparser:
         for deco in t.decorator_list:
             self.fill("@")
             self.dispatch(deco)
-        self.fill("class "+t.name)
+        self.fill(f"class {t.name}")
         if six.PY3:
             self.write("(")
             comma = False
@@ -354,7 +354,7 @@ class Unparser:
         for deco in t.decorator_list:
             self.fill("@")
             self.dispatch(deco)
-        def_str = fill_suffix+" "+t.name + "("
+        def_str = f"{fill_suffix} {t.name}("
         self.fill(def_str)
         self.dispatch(t.args)
         self.write(")")
@@ -443,20 +443,18 @@ class Unparser:
         self.write(repr(t.s))
 
     def _Str(self, tree):
-        if six.PY3:
+        if (
+            not six.PY3
+            and "unicode_literals" not in self.future_imports
+            or six.PY3
+        ):
             self.write(repr(tree.s))
+        elif isinstance(tree.s, str):
+            self.write(f"b{repr(tree.s)}")
+        elif isinstance(tree.s, unicode):
+            self.write(repr(tree.s).lstrip("u"))
         else:
-            # if from __future__ import unicode_literals is in effect,
-            # then we want to output string literals using a 'b' prefix
-            # and unicode literals with no prefix.
-            if "unicode_literals" not in self.future_imports:
-                self.write(repr(tree.s))
-            elif isinstance(tree.s, str):
-                self.write("b" + repr(tree.s))
-            elif isinstance(tree.s, unicode):
-                self.write(repr(tree.s).lstrip("u"))
-            else:
-                assert False, "shouldn't get here"
+            assert False, "shouldn't get here"
 
     def _JoinedStr(self, t):
         # JoinedStr(expr* values)
@@ -487,7 +485,7 @@ class Unparser:
 
     def _fstring_JoinedStr(self, t, write):
         for value in t.values:
-            meth = getattr(self, "_fstring_" + type(value).__name__)
+            meth = getattr(self, f"_fstring_{type(value).__name__}")
             meth(value, write)
 
     def _fstring_Str(self, t, write):
@@ -513,7 +511,7 @@ class Unparser:
             write("!{conversion}".format(conversion=conversion))
         if t.format_spec:
             write(":")
-            meth = getattr(self, "_fstring_" + type(t.format_spec).__name__)
+            meth = getattr(self, f"_fstring_{type(t.format_spec).__name__}")
             meth(t.format_spec, write)
         write("}")
 
@@ -682,7 +680,7 @@ class Unparser:
     def _BinOp(self, t):
         self.write("(")
         self.dispatch(t.left)
-        self.write(" " + self.binop[t.op.__class__.__name__] + " ")
+        self.write(f" {self.binop[t.op.__class__.__name__]} ")
         self.dispatch(t.right)
         self.write(")")
 
@@ -692,14 +690,14 @@ class Unparser:
         self.write("(")
         self.dispatch(t.left)
         for o, e in zip(t.ops, t.comparators):
-            self.write(" " + self.cmpops[o.__class__.__name__] + " ")
+            self.write(f" {self.cmpops[o.__class__.__name__]} ")
             self.dispatch(e)
         self.write(")")
 
     boolops = {ast.And: 'and', ast.Or: 'or'}
     def _BoolOp(self, t):
         self.write("(")
-        s = " %s " % self.boolops[t.op.__class__]
+        s = f" {self.boolops[t.op.__class__]} "
         interleave(lambda: self.write(s), self.dispatch, t.values)
         self.write(")")
 
@@ -797,17 +795,17 @@ class Unparser:
             if first:first = False
             else: self.write(", ")
             self.write("*")
-            if t.vararg:
-                if hasattr(t.vararg, 'arg'):
-                    self.write(t.vararg.arg)
-                    if t.vararg.annotation:
-                        self.write(": ")
-                        self.dispatch(t.vararg.annotation)
-                else:
-                    self.write(t.vararg)
-                    if getattr(t, 'varargannotation', None):
-                        self.write(": ")
-                        self.dispatch(t.varargannotation)
+        if t.vararg:
+            if hasattr(t.vararg, 'arg'):
+                self.write(t.vararg.arg)
+                if t.vararg.annotation:
+                    self.write(": ")
+                    self.dispatch(t.vararg.annotation)
+            else:
+                self.write(t.vararg)
+                if getattr(t, 'varargannotation', None):
+                    self.write(": ")
+                    self.dispatch(t.varargannotation)
 
         # keyword-only arguments
         if getattr(t, "kwonlyargs", False):
@@ -824,12 +822,12 @@ class Unparser:
             if first:first = False
             else: self.write(", ")
             if hasattr(t.kwarg, 'arg'):
-                self.write("**"+t.kwarg.arg)
+                self.write(f"**{t.kwarg.arg}")
                 if t.kwarg.annotation:
                     self.write(": ")
                     self.dispatch(t.kwarg.annotation)
             else:
-                self.write("**"+t.kwarg)
+                self.write(f"**{t.kwarg}")
                 if getattr(t, 'kwargannotation', None):
                     self.write(": ")
                     self.dispatch(t.kwargannotation)
@@ -854,7 +852,7 @@ class Unparser:
     def _alias(self, t):
         self.write(t.name)
         if t.asname:
-            self.write(" as "+t.asname)
+            self.write(f" as {t.asname}")
 
     def _withitem(self, t):
         self.dispatch(t.context_expr)
@@ -880,17 +878,17 @@ def testdir(a):
     try:
         names = [n for n in os.listdir(a) if n.endswith('.py')]
     except OSError:
-        print("Directory not readable: %s" % a, file=sys.stderr)
+        print(f"Directory not readable: {a}", file=sys.stderr)
     else:
         for n in names:
             fullname = os.path.join(a, n)
             if os.path.isfile(fullname):
                 output = StringIO()
-                print('Testing %s' % fullname)
+                print(f'Testing {fullname}')
                 try:
                     roundtrip(fullname, output)
                 except Exception as e:
-                    print('  Failed to compile, exception is %s' % repr(e))
+                    print(f'  Failed to compile, exception is {repr(e)}')
             elif os.path.isdir(fullname):
                 testdir(fullname)
 
